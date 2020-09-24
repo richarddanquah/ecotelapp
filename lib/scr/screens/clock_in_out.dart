@@ -3,27 +3,20 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as Math;
 import 'package:ecotelunfiedapp/scr/models/aws_rekognition_model.dart';
-import 'package:ecotelunfiedapp/scr/models/user_location.dart';
-import 'package:ecotelunfiedapp/scr/providers/location_service.dart';
 import 'package:flutter/material.dart';
+import 'package:location/location.dart';
 //import 'package:google_fonts/google_fonts.dart';
-import 'package:ecotelunfiedapp/scr/screens/home.dart';
-import 'package:ecotelunfiedapp/scr/screens/profile.dart';
-import 'package:provider/provider.dart';
 
 import '../../constants.dart';
 import '../../user_shared_pref.dart';
 import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:convert';
-import 'package:ecotelunfiedapp/scr/models/user_location.dart';
 
 import 'package:avatar_glow/avatar_glow.dart';
 import 'package:image/image.dart' as Img;
 import 'package:image_picker/image_picker.dart';
-import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart';
 import 'package:geolocator/geolocator.dart';
@@ -32,13 +25,10 @@ import 'package:geocoder/geocoder.dart';
 //import 'package:geolocation/geolocation.dart';
 //import 'package:http/io_client.dart';
 import 'package:custom_progress_dialog/custom_progress_dialog.dart';
-import 'package:provider/provider.dart';
 
 import 'package:aws_ai/src/RekognitionHandler.dart';
 //import 'package:location_permissions/location_permissions.dart' as LocationPerm;
-import 'package:permission_handler/permission_handler.dart';
 //import 'package:location/location.dart';
-import 'package:flushbar/flushbar.dart';
 
 //import 'facial_recognition.dart';
 
@@ -48,7 +38,7 @@ class ClockInOut extends StatefulWidget {
 }
 
 class _ClockInOutState extends State<ClockInOut> {
-  PermissionStatus _status;
+  //PermissionStatus _status;
   Position _position;
   StreamSubscription<Position> _streamSubscription;
   Address _address;
@@ -78,6 +68,13 @@ class _ClockInOutState extends State<ClockInOut> {
 
   UserSharedPref _userSharedPref = new UserSharedPref();
   ProgressDialog _progress = ProgressDialog();
+
+  Location location = new Location();
+  LocationData _locationData;
+  bool _serviceEnabled;
+  PermissionStatus _permissionGranted;
+
+  Position position;
 
   Future getUserDetails() async {
     _userSharedPref.getUserPhoto().then((img) {
@@ -201,13 +198,13 @@ class _ClockInOutState extends State<ClockInOut> {
                           'Please wait checking your location...');
 
                   checkLocation().then((response) {
-                    if (response.statusCode == 200) {
+                    if (response == 200) {
                       _progress.dismissProgressDialog(context);
                       showAlertDialog(context);
                       setState(() {
                         _isLoading = true;
                       });
-                    } else if (response.statusCode == 401) {
+                    } else if (response == 401) {
                       _progress.dismissProgressDialog(context);
                       _commentDialog(context);
                       setState(() {
@@ -285,30 +282,31 @@ class _ClockInOutState extends State<ClockInOut> {
 
 //////////CHECK LOCATION //////////////////////////////////
 
-  Future<http.Response> checkLocation() async {
+  Future<int> checkLocation() async {
     debugPrint("Checking Location");
 
     var branchId = this.branch;
 
     debugPrint('branchId: $branchId');
 
-    Map<Permission, PermissionStatus> statuses =
-        await [Permission.location].request();
-    print(statuses[Permission.location]);
-
-    if (await Permission.location.request().isGranted) {
-      // Either the permission was already granted before or the user just granted it.
-
-      if (await Permission.locationWhenInUse.serviceStatus.isEnabled) {
-        // Use location.
-        print("hello kwaku");
-
-       
-      } else {
-        openAppSettings();
+    _serviceEnabled = await location.serviceEnabled();
+    if (!_serviceEnabled) {
+      _serviceEnabled = await location.requestService();
+      if (!_serviceEnabled) {
+        return 401;
       }
     }
 
+    _permissionGranted = await location.hasPermission();
+    if (_permissionGranted == PermissionStatus.DENIED) {
+      _permissionGranted = await location.requestPermission();
+      if (_permissionGranted != PermissionStatus.GRANTED) {
+        return 401;
+      }
+    }
+    _locationData = await location.getLocation();
+    print("hello ${_locationData.latitude} ${_locationData.longitude}");
+      return 200;
     //if (statuses[Permission.location].toString() == '') {}
 
     //    Geolocator geolocator = Geolocator()..forceAndroidLocationManager = true;
