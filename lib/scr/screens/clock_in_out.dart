@@ -5,13 +5,11 @@ import 'dart:math' as Math;
 import 'package:ecotelunfiedapp/scr/models/aws_rekognition_model.dart';
 import 'package:flutter/material.dart';
 import 'package:location/location.dart';
-//import 'package:google_fonts/google_fonts.dart';
 
 import '../../constants.dart';
 import '../../user_shared_pref.dart';
 import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
-import 'dart:convert';
 
 import 'package:avatar_glow/avatar_glow.dart';
 import 'package:image/image.dart' as Img;
@@ -21,16 +19,10 @@ import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoder/geocoder.dart';
-//import 'package:geolocator/geolocator.dart';
-//import 'package:geolocation/geolocation.dart';
-//import 'package:http/io_client.dart';
+
 import 'package:custom_progress_dialog/custom_progress_dialog.dart';
 
 import 'package:aws_ai/src/RekognitionHandler.dart';
-//import 'package:location_permissions/location_permissions.dart' as LocationPerm;
-//import 'package:location/location.dart';
-
-//import 'facial_recognition.dart';
 
 class ClockInOut extends StatefulWidget {
   @override
@@ -60,11 +52,6 @@ class _ClockInOutState extends State<ClockInOut> {
 
   var isEnabled;
   File _image;
-
-  //var geolocator = Geolocator();
-
-  //Future<LocationPerm.ServiceStatus> locationStatus;
-  //LocationPerm.PermissionStatus permission;
 
   UserSharedPref _userSharedPref = new UserSharedPref();
   ProgressDialog _progress = ProgressDialog();
@@ -115,7 +102,6 @@ class _ClockInOutState extends State<ClockInOut> {
     });
 
     super.initState();
-  
   }
 
   @override
@@ -262,7 +248,7 @@ class _ClockInOutState extends State<ClockInOut> {
       'Authorization': 'Bearer $toking'
     }).timeout(Duration(seconds: 60));
 
-    debugPrint("----clock response is-------- $response");
+    //debugPrint("----clock response is-------- $response");
 
     if (response.statusCode == 200) {
       var dataConvertedToJSON = json.decode(response.body);
@@ -306,33 +292,21 @@ class _ClockInOutState extends State<ClockInOut> {
     }
     _locationData = await location.getLocation();
     print("hello ${_locationData.latitude} ${_locationData.longitude}");
-      return 200;
-    //if (statuses[Permission.location].toString() == '') {}
+    var url = '${_constants.apiUrl}/api/check_user_location_app';
+    debugPrint('url: $url');
+    var response = await http.post(Uri.parse(url), body: {
+      'branch_id': branchId.toUpperCase(),
+      'lng': _locationData.latitude.toString(),
+      'lat': _locationData.longitude.toString()
+    });
 
-    //    Geolocator geolocator = Geolocator()..forceAndroidLocationManager = true;
-//    //GeolocationStatus geolocationStatus =
-//    //  await geolocator.checkGeolocationPermissionStatus();
-//
-//    //if (geolocationStatus.toString() == 'GeolocationStatus.granted') {
-//    Position position = await Geolocator()
-//        .getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
-//
-//    debugPrint("latitude is ${position.latitude}");
-//    debugPrint("longitude is ${position.longitude}");
-//
-//    var url = '${_constants.apiUrl}/api/check_user_location_app';
-//    debugPrint('url: $url');
-//
-//    var response = await http.post(Uri.parse(url), body: {
-//      'branch_id': branchId.toUpperCase(),
-//      'lng': position.longitude.toString(),
-//      'lat': position.latitude.toString()
-//    });
-//
-//    debugPrint('Check Location Response status: ${response.statusCode}');
-//
-//    return response;
-    //}
+    debugPrint('Check Location Response status: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      return 200;
+    } else if (response.statusCode == 401) {
+      return 401;
+    }
   }
 
 //// END OF CHECK LOCATION ////////////////////////////////
@@ -460,6 +434,19 @@ class _ClockInOutState extends State<ClockInOut> {
           });
 
           ////// END OF AMAZON FACIAL RECOGNITION //////////////////
+        } else {
+          Fluttertoast.showToast(
+              msg: 'Image verification from Rocksters failed. Contact Admin!!',
+              toastLength: Toast.LENGTH_SHORT,
+              gravity: ToastGravity.CENTER,
+              timeInSecForIosWeb: 5,
+              backgroundColor: Colors.red,
+              textColor: Colors.white,
+              fontSize: 16.0);
+
+          setState(() {
+            _isLoading = false;
+          });
         }
       });
       //// END OF PROCESSING IMAGE ///////////
@@ -708,35 +695,30 @@ class _ClockInOutState extends State<ClockInOut> {
     debugPrint('comments: $comments');
 
     var url = '${_constants.apiUrl}/api/attendancelogs';
-//
-//    Position position = await Geolocator()
-//        .getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-//
-//    setState(() {
-//      debugPrint("latitude is ${position.latitude}");
-//      debugPrint("longitude is ${position.longitude}");
-//    });
-//
-//    List<Placemark> placeMark = await Geolocator()
-//        .placemarkFromCoordinates(position.latitude, position.longitude);
-//
-//    debugPrint('placeMark: $placeMark');
-//
-//    var name =
-//        placeMark[0].thoroughfare == null ? '' : placeMark[0].thoroughfare;
-//
-//    debugPrint('name: $name');
-//
-//    var country = placeMark[0].country == null ? '' : placeMark[0].country;
-//
-//    debugPrint('country: $country');
-//
-//    var locationName = name + " " + country;
-//    debugPrint('location name.................$locationName');
-//
-//    var clockInLatitude = position.latitude;
-//    var clockInLongitude = position.longitude;
-//    var clockInLocationName = locationName;
+
+    _serviceEnabled = await location.serviceEnabled();
+    if (!_serviceEnabled) {
+      _serviceEnabled = await location.requestService();
+      if (!_serviceEnabled) {
+        return 401;
+      }
+    }
+
+    _permissionGranted = await location.hasPermission();
+    if (_permissionGranted == PermissionStatus.DENIED) {
+      _permissionGranted = await location.requestPermission();
+      if (_permissionGranted != PermissionStatus.GRANTED) {
+        return 401;
+      }
+    }
+    _locationData = await location.getLocation();
+    print("hello ${_locationData.latitude} ${_locationData.longitude}");
+
+    var locationName = '';
+
+    var clockInLatitude = _locationData.latitude;
+    var clockInLongitude = _locationData.longitude;
+    var clockInLocationName = locationName;
     var clockInComment = comments;
     var clockInDevice = "Phone";
 
@@ -753,11 +735,11 @@ class _ClockInOutState extends State<ClockInOut> {
     http.Response response = await http
         .post(url,
             body: {
-              "clock_in_latitude": '',
-              "clock_in_longitude": '',
+              "clock_in_latitude": clockInLatitude.toString(),
+              "clock_in_longitude": clockInLongitude.toString(),
               "clock_in_comment": clockInComment,
               "clock_in_device": clockInDevice,
-              "clock_in_location_name": '',
+              "clock_in_location_name": clockInLocationName,
               "clock_in_time": DateTime.now().toIso8601String(),
               "user_id": userId,
               "status": status
@@ -822,34 +804,29 @@ class _ClockInOutState extends State<ClockInOut> {
 
     var url = '${_constants.apiUrl}/api/attendancelogs';
 
-    // Position position = await Geolocator()
-    // .getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    _serviceEnabled = await location.serviceEnabled();
+    if (!_serviceEnabled) {
+      _serviceEnabled = await location.requestService();
+      if (!_serviceEnabled) {
+        return 401;
+      }
+    }
 
-//    setState(() {
-//      debugPrint("latitude is ${position.latitude}");
-//      debugPrint("longitude is ${position.longitude}");
-//    });
+    _permissionGranted = await location.hasPermission();
+    if (_permissionGranted == PermissionStatus.DENIED) {
+      _permissionGranted = await location.requestPermission();
+      if (_permissionGranted != PermissionStatus.GRANTED) {
+        return 401;
+      }
+    }
+    _locationData = await location.getLocation();
+    print("hello ${_locationData.latitude} ${_locationData.longitude}");
 
-//    List<Placemark> placeMark = await Geolocator()
-//        .placemarkFromCoordinates(position.latitude, position.longitude);
+    var locationName = '';
 
-    //debugPrint('placeMark: $placeMark');
-
-//    var name =
-//        placeMark[0].thoroughfare == null ? '' : placeMark[0].thoroughfare;
-//
-//    debugPrint('name: $name');
-//
-//    var country = placeMark[0].country == null ? '' : placeMark[0].country;
-//
-//    debugPrint('country: $country');
-//
-//    var locationName = name + " " + country;
-//    debugPrint('location name.................$locationName');
-//
-//    var clockOutLatitude = position.latitude;
-//    var clockOutLongitude = position.longitude;
-    // var clockOutLocationName = locationName;
+    var clockOutLatitude = _locationData.latitude;
+    var clockOutLongitude = _locationData.longitude;
+    var clockOutLocationName = locationName;
     var clockOutComment = comments;
     var clockOutDevice = "Phone";
 
@@ -866,11 +843,11 @@ class _ClockInOutState extends State<ClockInOut> {
     http.Response response = await http
         .post(url,
             body: {
-              "clock_out_latitude": '',
-              "clock_out_longitude": '',
+              "clock_out_latitude": clockOutLatitude.toString(),
+              "clock_out_longitude": clockOutLongitude.toString(),
               "clock_out_comment": clockOutComment,
               "clock_out_device": clockOutDevice,
-              "clock_out_location_name": '',
+              "clock_out_location_name": clockOutLocationName,
               "clock_in_time": DateTime.now().toIso8601String(),
               "user_id": userId,
               "status": status
@@ -911,5 +888,3 @@ class _ClockInOutState extends State<ClockInOut> {
 //////// SEND sendAttendanceClockOutData/////////////////
 
 }
-
-

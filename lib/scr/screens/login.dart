@@ -216,6 +216,15 @@ class _LoginState extends State<Login> {
           backgroundColor: Colors.red,
           textColor: Colors.white,
           fontSize: 16.0);
+    } else {
+      Fluttertoast.showToast(
+          msg: 'Cannot Login kindly check your internet/data',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.CENTER,
+          timeInSecForIosWeb: 5,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          fontSize: 16.0);
     }
   }
 }
